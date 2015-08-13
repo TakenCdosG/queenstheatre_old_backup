@@ -1,0 +1,103 @@
+<?php
+
+function hk_init(){
+}
+
+function hk_current_node(){    
+
+   if(arg(0)=='node'&&is_numeric(arg(1))){
+    return node_load(arg(1));      
+    
+  }    
+    
+  return NULL;             
+}    
+         
+
+
+
+function hk_mail($key, &$message, $params) {
+  
+  $language = $message['language'];
+  $user = user_load((integer)$params['uid']);
+  $variables = user_mail_tokens($user,$language);
+  $variables = array_merge($variables,$params);
+  
+  $body = $params['body'];
+  $subject = $params['subject'];
+  $message['subject'] = t($subject, $variables, $language->language);
+  $message['body'][] = t($body, $variables, $language->language);
+  
+  
+  if($params['HTML']){
+     $headers = array(
+      'MIME-Version' => '1.0',
+      'Content-Type' => 'text/html; charset=UTF-8; format=flowed',
+      'Content-Transfer-Encoding' => '8Bit',
+      'X-Mailer' => 'Drupal'
+    );
+  
+    foreach ($headers as $key => $value) {
+      $message['headers'][$key] = $value;
+    }
+
+  }      
+}
+
+
+
+function hk_cleanstring($string, $clean_slash = TRUE) {
+  // Default words to ignore
+  $white_list =array (
+  'a' => 'a',
+  'b' => 'b',
+  'c' => 'c',
+  'd' => 'd',
+  'e' => 'e',
+  'f' => 'f',
+  'g' => 'g',
+  'h' => 'h',
+  'i' => 'i',
+  'j' => 'j',
+  'k' => 'k',
+  'l' => 'l',
+  'm' => 'm',
+  'n' => 'n',
+  'o' => 'o',
+  'p' => 'p',
+  'q' => 'q',
+  'r' => 'r',
+  's' => 's',
+  't' => 't',
+  'u' => 'u',
+  'v' => 'v',
+  'w' => 'w',
+  'x' => 'x',
+  'y' => 'y',
+  'z' => 'z',
+  0 => '0',
+  1 => '1',
+  2 => '2',
+  3 => '3',
+  4 => '4',
+  5 => '5',
+  6 => '6',
+  7 => '7',
+  8 => '8',
+  9 => '9',
+  '-' => '-',
+  '_' => '_',
+  );      
+   $string = strtolower(str_replace(" ","-",$string));
+  
+  for($i=0;$i<strlen($string);$i++){
+    if(array_key_exists($string[$i],$white_list)) {
+      $output .=  $string[$i];
+    }
+  }    
+
+  return $output;
+}
+
+
+    

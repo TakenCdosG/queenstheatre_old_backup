@@ -1,0 +1,24 @@
+; $Id: queens.info,v 1.4 2007/06/08 05:50:58 dries Exp $
+name = Queens Theater
+description = Tableless, multi-column theme in grey and blue tones.
+version = VERSION
+core = 6.x
+engine = phptemplate
+regions[left] = Left sidebar
+regions[right] = Right sidebar
+regions[content] = Content
+regions[header] = Header
+regions[main_menu] = Menu
+regions[sub_menu] = Second Menu
+regions[footer] = Footer
+regions[map] = Map
+regions[site_map] = Site Map
+
+stylesheets[all][] = style.css
+stylesheets[print][] = print.css
+
+; Information added by drupal.org packaging script on 2010-12-15
+version = "6.20"
+project = "queens"
+datestamp = "122447788"
+

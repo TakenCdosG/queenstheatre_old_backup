@@ -1,0 +1,854 @@
+<?php
+
+define("MAXIREF_PM_TITLE",0);
+define("MAXIREF_PM_TEASER",1);
+define("MAXIREF_PM_VIEW",2);
+
+
+/**
+ * Implementation of hook_views_api().
+ *
+ * This tells drupal that there is Views integration file named 
+ * module-name.views.inc 
+ */
+
+function maxiref_views_api() {
+  return array(
+    'api' => 2.0
+  );
+}
+
+
+function maxiref_init(){
+  
+   if($_GET["maxiref-iframe"]){
+     
+     //adding base javascript functions
+     drupal_add_js("
+       document.maxirefElement = '".maxiref_sv($_GET['maxiref-element'])."';
+       document.maxirefEditMode= '".maxiref_sv($_GET['maxiref-edit-mode'])."';
+      
+     ","inline");
+     
+     //Adding the reize behavior for iframe
+    if($_GET['maxiref-edit-mode']=='iframe'){
+      drupal_add_js("
+        $( function(){
+
+          if(window.frameElement){
+            $(document.body).css('float','left');
+            $(window.frameElement).height( $(document.body).height() + 20 );
+
+            setInterval(function(){
+              $(window.frameElement).height( $(document.body).height() + 20 );
+              $(window.frameElement).attr('scrolling','no');
+            }, 400);
+
+          }
+        });
+      ","inline");
+    }
+
+
+     
+          
+     
+     global $user;
+    $user->theme = "cleantheme";
+    init_theme();
+    
+   }
+   
+   
+
+}
+
+/**
+* Implementation of hook_menu().
+*/
+function maxiref_menu() {
+  $items['maxiref-node-preview/%/%'] = array(
+  'page callback' => 'maxiref_node_preview',
+  'page arguments' => array(1,2),
+  'access callback' => TRUE,
+  'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+function maxiref_node_preview($nid, $preview_mode){  
+  print _maxiref_node_preview($nid, $preview_mode, maxiref_sv($_GET["view_path"]));
+  exit;
+}
+
+function _maxiref_node_preview($nid,$preview_mode = 0,$view_path=NULL){
+  
+  switch($preview_mode){
+     case MAXIREF_PM_TEASER:    
+        return node_view(node_load($nid),TRUE);  
+     
+     case MAXIREF_PM_VIEW:
+        $view_path = str_replace("[nid]",$nid,$view_path);
+        return menu_execute_active_handler($view_path);
+     
+     default:
+        return "<strong class='maxiref-title'>".node_load($nid)->title."</strong>";   
+  }
+  
+}
+
+function  maxiref_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL){ 
+
+ 
+  if( ($op=="update" || $op == "insert" || $op == "delete" ) && $_GET["maxiref-action"] ){      
+        
+    $element = maxiref_sv($_GET["maxiref-element"]);
+    $action = maxiref_sv($_GET["maxiref-action"] );    
+    $mode = maxiref_sv($_GET["maxiref-edit-mode"] );
+    $nid = $node->nid;
+
+    drupal_set_message("<script type='text/javascript'>
+      window.parent.maxiref_update('$element','$action','$nid');
+      window.parent.maxiref_{$mode}_{$action}_end('$element');
+    </script>");
+  }
+  
+}
+
+function maxiref_theme(){
+  $theme = array(
+    'maxiref_compact_form' => array(
+      'arguments' => $form),
+    );
+    
+    return $theme;
+}
+
+/**
+* TODO: A theme to make the node-edit forms more compact
+* 
+* @param mixed $form
+* @return mixed
+*/
+function theme_maxiref_compact_form($form){  
+  return "Holla";
+}
+
+function  maxiref_form_alter(&$form, &$form_state, $form_id){
+  //Hidding the iframe buttons, becouse the iframe mode already has buttons  
+  if($_GET["maxiref-edit-mode"]=="iframe"){
+    
+   // $form["#theme"] = "maxiref_compact_form";
+  }
+   
+}
+
+
+function maxiref_widget_info() {
+  return array(
+    'maxiref' => array(
+      'label' => t('Maxiref Reference'),
+      'field types' => array('nodereference'),
+      'multiple values' => CONTENT_HANDLE_CORE,
+      'callbacks' => array(
+        'default value' => CONTENT_CALLBACK_DEFAULT,
+      ),
+    ),
+  );
+}
+
+
+
+
+/**
+* Implementation of hook_widget_settings().
+*/
+function maxiref_widget_settings($op, $widget) {
+  switch ($op) {
+    case 'form':
+      $form = array();
+      
+       $width = isset($widget['width'])?$widget['width']:"600px";
+      
+       $form['width'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Width'),
+        '#default_value' => $width,
+        '#required' => TRUE,
+       );
+        
+       $height = isset($widget['height'])?$widget['height']:"500px"; 
+       
+       $form['height'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Height'),
+        '#default_value' => $height,
+        '#required' => TRUE,
+       );
+       
+       $edit_mode = isset($widget['edit_mode'])?$widget['edit_mode']:"lightbox"; 
+       
+       $form['edit_mode'] = array(
+        '#type' => 'select',
+        '#title' => t('Edit Mode'),
+        '#default_value' => $edit_mode,
+        '#options' => array('lightbox'=>'lightbox','iframe'=>'iframe'),
+        '#required' => TRUE,
+        "#description" => "The way you want to add/edit the references"
+       );
+       
+       
+      $preview_mode= (isset($widget['preview_mode']) && is_numeric($widget['preview_mode'])) ? $widget['preview_mode'] :0;
+     
+      $form['preview_mode'] = array(
+        '#type' => 'radios',
+        '#title' => t('Preview Mode'),
+        '#default_value' => $preview_mode,
+        '#options' => array(
+            MAXIREF_PM_TITLE=>"Title",
+            MAXIREF_PM_TEASER=>"Teaser",
+            MAXIREF_PM_VIEW=>"View",
+          ),
+        '#required' => TRUE,
+      );
+      
+      
+      $view_path= $widget['view_path'] ? $widget['view_path'] : 'maxiref-preview/[nid]';
+      $form['view_path'] = array(
+        '#type' => 'textfield',
+        '#title' => t('View Path'),
+        "#default" => $view_path,
+        "#description" =>  
+        t("If you check 'view' as Preview mode, you must set up here the view path to use.<br/>
+        The [nid] token will be replaced by the nid of the node to render, ensure your view support the nid argument. 
+        "),
+        '#default_value' => $view_path,
+      );
+      
+      
+      $browser_path = $widget['browser_path'] ? $widget['browser_path'] : "admin/maxiref-insert";
+      
+      $form['browser_path'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Browser Path'),
+        '#description' => t("Insert the path of the View to use as browser:
+        <ul>
+         <li>Use 'admin/maxiref-insert' path to see the default Maxiref view </li>
+         <li>You can also setup  your custom browser view not forgeting to add 'Maxiref Insert' field or Clonning 
+         the maxiref_insert view</li>
+         <li>Leave blank to hide the browser link</li>
+        </ul>
+        "),
+        '#default_value' => $browser_path,
+      );
+      
+      $delete_ref = $widget['delete_ref'] ? $widget['delete_ref'] : 0;
+      
+      $form['delete_ref'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Delete orphan references'),
+        '#description' => t("If you check this you can delete the reference directly on the edit form,
+          This not only unreferences the node, it also removes the node itself, ideal for containement relationships."),
+        '#default_value' => $delete_ref,
+      );
+      
+      
+      return $form;
+
+
+    case 'save':
+      return array('view_path',"preview_mode","width","height","delete_ref","browser_path","edit_mode");
+  }
+}
+
+/**
+* Implementation of hook_widget().
+*
+* @param $form
+*   the entire form array, 
+*   $form['#node'] holds node information
+* @param $form_state
+*   the form_state, 
+*   $form_state['values'][$field['field_name']]
+*   holds the field's form values.
+* @param $field
+*   the field array
+* @param $items
+*   array of default values for this field
+* @param $delta
+*   the order of this item in the array of 
+*   subelements (0, 1, 2, etc)
+*
+* @return
+*   the form item for a single element for this field
+*/
+function maxiref_widget(&$form, &$form_state, $field, $items, $delta = 0) {
+
+  $nid = $items[$delta]['nid'];    
+  
+  $field_info = content_fields($field["field_name"]);
+  
+  $all_types = array_sum($field_info["referenceable_types"])==0;
+  
+  //Check if no value is selected
+   foreach($field_info["referenceable_types"] as $type=>$value){    
+      if($value){
+        $all_types = false;
+        break; 
+      }
+  }
+
+  foreach($field_info["referenceable_types"] as $type=>$value){    
+      if($all_types||$value){
+        $ref_types[] = $type;
+      }
+  }
+  
+  
+  if(!$form["maxiref_script"]){
+    $form["maxiref_script"]["#value"] = maxiref_get_script(); 
+  }
+  
+  $preview_mode = $field["widget"]["preview_mode"];      
+  $width = $field["widget"]["width"]; 
+  $height = $field["widget"]["height"]; 
+  $delete_ref = $field["widget"]["delete_ref"]; 
+  $browser_path = $field["widget"]["browser_path"]; 
+  $view_path = $field["widget"]["view_path"]; 
+  $edit_mode = $field["widget"]["edit_mode"]; 
+  
+  $element['nid'] = array(
+    '#type' => "hidden",
+    '#default_value' => isset($nid) ? $nid : NULL,
+    '#attributes' => array('class' => 'example'),
+    "#process" => array("maxiref_widget_expand"),
+    "#preview_mode" => $preview_mode,    
+    "#ref_types" => $ref_types,
+    "#iframe_width" => $width,
+    "#iframe_height" => $height,
+    "#delete_ref" => $delete_ref,
+    "#browser_path" => $browser_path,
+    "#view_path" => $view_path,
+    "#edit_mode" => $edit_mode,
+  );
+  
+  $element['view'] = array(
+    "#value" => "",
+  );
+    
+  // Used so that hook_field('validate') knows where to 
+  // flag an error in deeply nested forms.
+  if (empty($form['#parents'])) {
+    $form['#parents'] = array();
+  }
+  $element['_error_element'] = array(
+    '#type' => 'value',
+    '#value' => implode('][', array_merge($form['#parents'], array('value'))),
+  );
+  
+  return $element;
+}
+
+function maxiref_get_script(){
+  
+ return  "<script type='text/javascript' >
+      function maxiref_update(element_id,action,nid){    
+        
+        var element = '#'+element_id;
+        var element_insert = '.' + element_id +'-insert';
+        var element_delete = '.' + element_id +'-delete';
+        var element_edit = '.' + element_id + '-edit';
+        
+        if(action=='delete'){
+          $(element_insert).show();
+          $('.' + element_id + '-edit-delete').hide();
+          $(element).val('');  
+          $('.' + element_id + '-add-links').show();
+           $(element+'-preview').html('');
+        }else
+        if( action == 'insert' || action == 'browse' ){
+          $('.' + element_id + '-add-links').hide();          
+          $('.' + element_id + '-edit-delete').show();
+ 
+           $(element).val(nid);  
+        }
+      
+                    
+        if( action == 'insert' || action == 'edit' || action == 'browse' ){          
+          
+         //hidding the insert and changing the base path for edit
+         maxiref_preview(element, nid);
+        }
+
+      }     
+      
+      function maxiref_preview(element, nid){      
+         var previewMode = $(element).get(0).previewMode;
+         previewMode = previewMode?previewMode:0;
+         var viewPath = $(element).get(0).viewPath;
+         $.get('".base_path()."maxiref-node-preview/'+nid+'/'+previewMode+'?view_path='+viewPath, function(data){
+            $(element+'-preview').html(data);          
+          });
+      }
+      
+      
+      //Lightbox Handlers
+      function maxiref_lightbox_insert_end(element_id){
+          var element_edit = '.' + element_id + '-edit';
+          var nid = $('#'+element_id).val();
+          $(element_edit).get(0).href = String($(element_edit).attr('alt')).replace('[nid]',nid);
+          $(element_edit).get(0).href = String($(element_edit).attr('alt')).replace('%5Bnid%5D',nid);
+          
+          var element_delete = '.' + element_id +'-delete';
+          
+          if($(element_delete).attr('alt')){
+            $(element_delete).get(0).href = String($(element_delete).attr('alt')).replace('[nid]',nid);
+            $(element_delete).get(0).href = String($(element_delete).attr('alt')).replace('%5Bnid%5D',nid);
+          }       
+          
+        window.parent.Lightbox.end();
+      }
+      
+      function maxiref_lightbox_browse_end(element_id){
+        maxiref_lightbox_insert_end(element_id);
+      }
+      
+      function maxiref_lightbox_edit_end(element_id){
+        window.parent.Lightbox.end();
+      }
+
+      function maxiref_lightbox_delete_end(element_id){
+          var element_delete = '.' + element_id +'-delete';
+          var nid = $('#'+element_id).val();
+          if($(element_delete).attr('alt')){
+            $(element_delete).get(0).href = String($(element_delete).attr('alt')).replace('[nid]',nid);
+            $(element_delete).get(0).href = String($(element_delete).attr('alt')).replace('%5Bnid%5D',nid);
+          }          
+        window.parent.Lightbox.end();
+      }
+      
+      
+      
+      //IFrame Handlers      
+      function maxiref_iframe_edit(element_id){
+         var nid = $('#'+element_id).val();
+         var element_edit = '.' + element_id + '-edit';         
+         var element_delete = '.' + element_id + '-delete'; 
+         var iframe = $('<iframe></iframe>');
+         
+         $(iframe).addClass( element_id+'-iframe' );
+         $(iframe).get(0).src = $(element_edit).attr('alt').replace('%5Bnid%5D',nid);
+         $(iframe).get(0).width = '500px';
+         $(iframe).get(0).height = '300px';
+         $(iframe).get(0).name = element_id+'-iframe';
+         
+         //getting the real instance of the iframe to access the document
+         var prevHTML =  $('#'+element_id+'-preview').html();
+         $('#'+element_id+'-preview').empty();
+          $('#'+element_id+'-preview').append(iframe);
+         var iframeobj = window.frames[element_id+'-iframe'];
+         
+         //creating save button
+         var save = $('<a>Save</a>');
+         $(save).addClass( element_id + '-save' );
+         $(save).get(0).href = '#' + element_id + '-preview';
+         $(save).click(function(){ 
+            $('#node-form', $('.'+element_id+'-iframe').get(0).contentWindow.document ).get(0).submit();    
+         });
+         
+         //creating cancel button
+         var cancel = $('<a>Cancel</a>');
+         $(cancel).addClass( element_id + '-cancel' );
+         $(cancel).get(0).href = '#' + element_id + '-preview';
+         $(cancel).click(function(){ 
+              $('#'+element_id+'-preview').html(prevHTML);
+              maxiref_iframe_edit_end(element_id);
+         });
+         
+         $(element_delete).after(cancel);  
+         $(element_edit).after(save);          
+         $(element_edit).hide();       
+         $(element_delete).hide();  
+         
+         $(iframe).get(0).contentWindow.document.body.onresize = function(){ console.info($(this).with());  };
+      }
+      
+      function maxiref_iframe_edit_end(element_id){
+        var element_edit = '.' + element_id + '-edit';
+        var element_delete = '.' + element_id + '-delete';
+        var element_iframe = '.' + element_id + '-iframe';
+        var element_save = '.' + element_id + '-save';        
+        var element_cancel = '.' + element_id + '-cancel';    
+        
+        $(element_edit).show();
+        $(element_delete).show();
+        $(element_iframe).remove();
+        $(element_save).remove();  
+        $(element_cancel).remove();      
+      }
+      
+      function maxiref_iframe_insert(element_id,url){
+         var add_links = '.' + element_id + '-add-links';
+         var element_edit = '.' + element_id + '-edit';
+         
+         var iframe = $('<iframe></iframe>');
+         
+         $(iframe).addClass( element_id+'-iframe' );
+         $(iframe).get(0).src = url;
+         $(iframe).get(0).width = '500px';
+         $(iframe).get(0).height = '300px';
+         $(iframe).get(0).name = element_id+'-iframe';
+         
+         //getting the real instance of the iframe to access the document
+         $('#'+element_id+'-preview').empty();
+          $('#'+element_id+'-preview').append(iframe);
+         var iframeobj = window.frames[element_id+'-iframe'];
+         
+         var insertCancel = $('<div/>');//the container
+         insertCancel.addClass( element_id + '-insert-cancel' );
+                  
+         var insert = $('<a>Insert</a>');
+         $(insert).addClass( element_id + '-save' );
+         $(insert).get(0).href = '#' + element_id + '-preview';
+         $(insert).click(function(){ 
+            $('#node-form', $('.'+element_id+'-iframe').get(0).contentWindow.document ).get(0).submit();    
+         });
+         
+         //creating cancel button
+         var cancel = $('<a>Cancel</a>');
+         $(cancel).addClass( element_id + '-cancel' );
+         $(cancel).get(0).href = 'javascript:';
+         $(cancel).click(function(){ 
+              $('#'+element_id+'-preview').html('');
+              $(add_links).show();  
+              $(insertCancel).remove();
+         });
+         
+         insertCancel.append(insert).append(' | ').append(cancel);
+         $(add_links).after(insertCancel);  
+         $(add_links).hide();                  
+      }
+      
+      function maxiref_iframe_insert_end(element_id, nid){
+        var element_insert_cancel= '.' + element_id + '-insert-cancel';
+        var element_iframe = '.' + element_id + '-iframe';
+                
+        var element_edit = '.' + element_id + '-edit';       
+        
+        $(element_iframe).remove();
+        $(element_insert_cancel).remove();        
+      }
+      
+       function maxiref_iframe_browse(element_id,url){
+       
+         var add_links = '.' + element_id + '-add-links';
+         var element_edit = '.' + element_id + '-edit';
+         
+         var iframe = $('<iframe></iframe>');
+         
+         $(iframe).addClass( element_id+'-iframe' );
+         $(iframe).get(0).src = url;
+         $(iframe).get(0).width = '500px';
+         $(iframe).get(0).height = '300px';
+         $(iframe).get(0).name = element_id+'-iframe';
+         
+         //getting the real instance of the iframe to access the document
+         $('#'+element_id+'-preview').empty();
+          $('#'+element_id+'-preview').append(iframe);
+         var iframeobj = window.frames[element_id+'-iframe'];
+         
+         //creating cancel button
+         var cancel = $('<a>Cancel</a>');
+         $(cancel).addClass( element_id + '-cancel' );
+         $(cancel).get(0).href = '#' + element_id + '-preview';
+         $(cancel).click(function(){ 
+              $('#'+element_id+'-preview').html('');
+              $(add_links).show();  
+              $(cancel).remove();
+         });
+         
+         $(add_links).after(cancel);  
+         $(add_links).hide();                 
+       
+       }
+       
+       function maxiref_iframe_browse_end(element_id){
+          var cancel = '.' + element_id + '-cancel';
+          var add_links = '.' + element_id + '-add-links';
+          var element_iframe = '.' + element_id + '-iframe';                
+          var element_edit = '.' + element_id + '-edit';       
+          var element_delete = '.' + element_id + '-delete';  
+        
+          $(element_iframe).remove();
+          $(cancel).remove();  
+          $(element_edit).show();
+          $(element_delete).show();  
+       }
+       
+       function maxiref_iframe_delete(element_id,url){
+         
+         var nid = $('#'+element_id).val();
+         var edit_links = '.' + element_id + '-edit';
+         var element_delete = '.' + element_id + '-delete';
+         var prevHTML = $('#'+element_id+'-preview').html();
+         var iframe = $('<iframe></iframe>');
+         
+         $(iframe).addClass( element_id+'-iframe' );
+         $(iframe).get(0).src = $(element_delete).attr('alt').replace('%5Bnid%5D',nid);
+         $(iframe).get(0).width = '500px';
+         $(iframe).get(0).height = '300px';
+         $(iframe).get(0).name = element_id+'-iframe';
+         
+         //getting the real instance of the iframe to access the document
+         $('#'+element_id+'-preview').empty();
+          $('#'+element_id+'-preview').append(iframe);
+         var iframeobj = window.frames[element_id+'-iframe'];
+         
+         //creating cancel button
+         var cancel = $('<a>Cancel</a>');
+         $(cancel).addClass( element_id + '-cancel' );
+         $(cancel).get(0).href = '#' + element_id + '-preview';
+         $(cancel).click(function(){ 
+              $('#'+element_id+'-preview').html(prevHTML);
+              $(edit_links).show();  
+              $(cancel).remove();
+         });
+         
+         $(edit_links).after(cancel);  
+         $(edit_links).hide();                
+       }
+       
+      function maxiref_iframe_delete_end(element_id){
+        var add_links = '.' + element_id + '-add-links';
+        $(add_links).show();
+      }
+        
+    </script>";      
+  
+}
+
+function maxiref_widget_expand($element,$form_state,$form){
+   
+    
+   $element["#suffix"] = $link;   
+   
+   $is_new = !$element["#value"];
+   $ref_types = $element["#ref_types"];
+   $nid = $element["#value"]?$element["#value"]:"[nid]";
+   $iframe_width = $element["#iframe_width"];
+   $iframe_height = $element["#iframe_height"];
+   $delete_ref = $element["#delete_ref"];
+   $browser_path = $element["#browser_path"];
+   $view_path = $element["#view_path"];
+   $preview_mode = $element["#preview_mode"];
+   $edit_mode = $element["#edit_mode"];
+   
+   $edit_link = maxiref_action_link(
+    array(
+      "url" => "node/$nid/edit",
+      "base_url" => "node/[nid]/edit",
+      "action" => "edit",
+      "text" => t("Edit"),
+      "element_id" => $element["#id"],
+      "hide" => $is_new,
+      "iframe_width" => $iframe_width,
+      "iframe_height" => $iframe_height,
+      "preview_mode" => $preview_mode,
+      "view_path" => $view_path,
+      "edit_mode" => $edit_mode,
+    )
+   );     
+     
+   if($delete_ref){
+      $delete_link = maxiref_action_link(
+        array(
+          "url" => "node/$nid/delete",
+          "base_url" => "node/[nid]/delete",
+          "action" => "delete",
+          "text" => t("Delete"),
+          "element_id" => $element["#id"],
+          "iframe_width" => $iframe_width,
+          "iframe_height" => $iframe_height,
+          "preview_mode" => $preview_mode,
+          "view_path" => $view_path,
+          "edit_mode" => $edit_mode,
+        )
+     );  
+   }else{
+     $delete_link = "<a href='javascript:' 
+     class = '".$element["#id"]."-delete'
+     onclick='maxiref_update(\"".$element["#id"]."\",\"delete\",\"$nid\")'>".t("Delete")."</div>";
+   }
+   
+   // To Insert from a view 
+   
+   /*Creating insert links*/
+  
+    $types = node_get_types();
+    
+    //creating node add links    
+    foreach($ref_types as $ref_type){  
+      
+      $links[] =  maxiref_action_link(
+        array(
+          "url" =>  "node/add/".str_replace("_","-",$ref_type) ,
+          "action" => "insert",
+          "text" => t("Add %type", array("%type" => $types[$ref_type]->name ) ),
+          "element_id" => $element["#id"],
+          "iframe_width" => $iframe_width,
+          "iframe_height" => $iframe_height,
+          "preview_mode" => $preview_mode,
+          "view_path" => $view_path,
+          "edit_mode" => $edit_mode,
+        )
+       );      
+    }
+    
+    
+    if($browser_path){
+      $links[] = maxiref_action_link(
+        array(
+          "url" => $browser_path,
+          "action" => "browse",
+          "text" => t("Browse"),
+          "element_id" => $element["#id"],
+          "iframe_width" => $iframe_width,
+          "iframe_height" => $iframe_height,
+          "preview_mode" => $preview_mode,
+          "view_path" => $view_path,
+          "edit_mode" => $edit_mode,
+        )
+       );  
+    }
+    
+
+      $create_links = implode(" | ",$links);
+
+
+    if($is_new){
+      $element["#suffix"] = "<div id='".$element["#id"]."-preview'></div>";
+    }
+    else{
+      $element["#suffix"] .= "<div id='".$element["#id"]."-preview'>"._maxiref_node_preview( $nid, $element["#preview_mode"],$view_path)."</div>";
+    }
+    
+    $element["#suffix"] .= "<div  ".
+    (!$is_new?" style='display:none' ":"").
+    " class='".$element["#id"]."-add-links'>".$create_links."</div>";        
+    
+    $element["#suffix"] .= "<div".
+    ($is_new?" style='display:none' ":"").
+    "  class='".$element["#id"]."-edit-delete'> ".
+    $edit_link;
+    
+    $element["#suffix"] .= " | ".$delete_link."</div>";
+  
+     
+  return $element;
+}
+
+
+function maxiref_action_link($options){
+  
+  switch($options["edit_mode"]){
+    case "iframe":
+      return maxiref_action_link_iframe($options);
+    default:
+      return maxiref_action_link_lightbox($options);    
+  }  
+}
+
+function maxiref_action_link_iframe($options){
+  $link_url = maxiref_link_url($options);
+  $base_url = maxiref_link_base_url($options);
+    
+    $link = "<a  
+     alt = '".$base_url."'
+     class = '".$options["element_id"]."-".$options["action"]."'
+       onclick='$(\"#".$options["element_id"]."\").get(0).previewMode = \"".$options["preview_mode"]."\";          
+       $(\"#".$options["element_id"]."\").get(0).editMode = \"".$options["edit_mode"]."\";  
+        $(\"#".$options["element_id"]."\").get(0).viewPath = \"".$options["view_path"]."\";  
+       maxiref_iframe_".$options["action"]."(\"".$options["element_id"]."\",\"".$link_url."\"); '
+     href='javascript:'
+     >".$options["text"]."</a>";
+  
+  return $link;
+  
+}
+
+function maxiref_action_link_lightbox($options){
+  
+   $link_url = maxiref_link_url($options);
+   $base_url = maxiref_link_base_url($options);
+       
+    $link = "<a  
+     alt = '".$base_url."'
+     class = '".$options["element_id"]."-".$options["action"]."'
+     rel='lightframe[|width:".$options["iframe_width"]."; height:".$options["iframe_height"]."; scrolling: auto;]'     onclick='$(\"#".$options["element_id"]."\").get(0).previewMode = \"".$options["preview_mode"]."\";
+      $(\"#".$options["element_id"]."\").get(0).editMode = \"".$options["edit_mode"]."\";  
+     $(\"#".$options["element_id"]."\").get(0).viewPath = \"".$options["view_path"]."\" '
+     href='".$link_url."'
+     >".$options["text"]."</a>";
+     
+  return $link;
+  
+  
+}
+
+function maxiref_link_url($options){
+  
+   foreach($options as $value){
+//save values pool to prevent xss  
+    $_SESSION['maxiref_safe_value'][$value] = $value;  
+  }
+  
+  
+  return    url(
+      $options["url"],
+      array("query"=>
+        array(
+          "maxiref-iframe"=>TRUE,
+          "maxiref-action"=>$options["action"],
+          "maxiref-element"=>$options["element_id"],
+          "maxiref-edit-mode" => $options["edit_mode"],
+        )
+      )
+    );  
+  
+}
+
+
+function maxiref_link_base_url($options){
+  
+  foreach($options as $value){
+     //save values pool to prevent xss, used by maxiref_sv
+    $_SESSION['maxiref_safe_value'][$value] = $value;  
+  }  
+    return  url(
+      $options["base_url"],
+      array("query"=>
+        array(
+          "maxiref-iframe"=>TRUE,
+          "maxiref-action"=>$options["action"],
+          "maxiref-element"=>$options["element_id"],
+          "maxiref-edit-mode" => $options["edit_mode"],
+        )
+      )
+    );
+  
+}
+
+/**
+*  Maxiref Save Values: Used to verify if the value was generated by the system to prevent xss
+* 
+* @param mixed $value
+* @return mixed
+*/
+function maxiref_sv($value){
+  
+  if(!isset($_SESSION['maxiref_safe_value'][$value])){
+    drupal_set_message("Illegal value: ".check_plain($value),'error');
+  }
+  
+  return $_SESSION['maxiref_safe_value'][$value];  
+}

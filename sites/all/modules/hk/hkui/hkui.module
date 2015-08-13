@@ -1,0 +1,499 @@
+<?php
+//; $Id$
+
+
+function hkui_menu() {
+  
+  $items['cp'] = array(
+    'title'=>'Control Panel',
+    'type' => MENU_CALLBACK,
+    'page callback' => 'hkui_control_pannel', 
+    'access callback' => TRUE,
+  ); 
+  
+  $items['hkui_list_pages_url'] = array(
+    'type' => MENU_CALLBACK,
+    'page callback'   => 'lsi_cck_list_pages_url',
+    'access callback' => 'user_is_logged_in' ,
+  );  
+  
+  return $items;
+}
+
+function hkui_cp_access(){
+  global $user;
+  
+  
+  return  $user->uid == 1 ||  $user->roles[4]  || $user->roles[3];
+}
+
+function hkui_init(){
+  global $user;
+    
+  if(user_is_logged_in()){
+    $md = drupal_get_path('module','hkui');     
+    drupal_add_css($md."/hkui.css");
+  } 
+  
+
+  
+}
+
+function hkui_add_facebox(){
+  
+  
+  $js = drupal_get_path('module','hkui').'/javascripts/';  
+  
+  drupal_add_js($js."facebox/facebox.js");
+  drupal_add_css($js."facebox/facebox.css");
+  
+  drupal_add_js("$(
+    function(){
+      $('a[rel=facebox]').facebox({
+        'loadingImage' : '".base_path().$js."facebox/loading.gif',
+        'closeImage'   : '".base_path().$js."facebox/closelabel.gif'
+        });
+    });
+   ",
+  "inline"
+  );
+  
+}
+
+function hkui_theme() {
+   return array(
+    'hkui_admininstration_panel' => array(  //Easy Control Panel
+        'arguments' => array('groups' => array()),
+        'template'  => 'administration-panel',
+    ),
+    
+    'hkui_menu_parent' => array(  //Fancy style for Menu Settings
+      'arguments' => array('element'=>NULL),
+    ),
+    
+    'hkui_quick_tasks' => array(  //Fancy style for Menu Settings
+      'arguments' => array('groups'=>NULL),
+      'template'  => 'quick-tasks',  
+    ),
+    
+    'hkui_slideshow_field' => array( //Display an slideshow based on a cck multiple imagefield/imagelink
+      'arguments' => array('imagefield'=>NULL),
+      'template'  => 'slideshow-field',      
+    ),
+    
+    );
+}
+
+
+function hkui_panel(){
+  
+  $tree = menu_tree_page_data('hkui_cp');    
+  
+  foreach($tree as $item){
+    
+    if($item["below"]){
+      foreach($item["below"] as $item2){
+        $groups[$item["link"]["title"]][] =   array(
+          "title" => $item2['link']['title'],
+          "description" => $item2['link']['description'],
+          "base_path" => $item2['link']['link_path'],    
+          "path"        => url($item2['link']['link_path']),
+          "image"       =>  "",
+        );
+      }
+    }
+    else{
+      $groups["Main Tasks"][] =   array(
+        "title" => $item['link']['title'],
+        "description" => $item['link']['description'],
+        "base_path" => $item['link']['link_path'],    
+        "path"        => url($item['link']['link_path']),
+        "image"       =>  "",
+      );
+    } 
+  }
+  
+
+  
+  return $groups;
+}
+
+
+function hkui_control_pannel() {
+
+  global $user;
+  
+  if(user_is_anonymous()){
+    return drupal_get_form('user_login_block');    
+  }
+  
+  
+  drupal_add_js('misc/collapse.js');  
+  $roles = implode(", ",$user->roles);  
+  
+  $cache = cache_get("hkui_cp:".$roles);     
+  
+  if($cache->data){
+    return theme('hkui_admininstration_panel',$cache->data); ;
+  }
+  
+  $groups = hkui_panel();
+  
+  //Reviewing permissions
+  $no_permisions = false; //flag
+  foreach($groups as $key1=>$items){
+    
+    foreach($items as $key2=>$item){
+
+      $router_item = menu_get_item($item['base_path']);
+      if(!$router_item['access']){
+        unset($groups[$key1][$key2]);
+        $no_permisions |= true;
+      }
+    }
+    if(sizeof($groups[$key1])==0){
+      unset($groups[$key1]);
+    }
+  }
+  
+  cache_set("hkui_cp:".$roles,$groups);
+
+  
+  return theme('hkui_admininstration_panel',$groups);  
+}
+
+  
+
+function hkui_quicktasks_block(){
+  
+  global $user;
+  
+  if(user_is_anonymous()){ 
+     return;
+  }
+  
+  $roles = implode(",",$user->roles); 
+  
+  $cache =  cache_get("hkui_cp:$roles");  
+  
+  if($cache->data){  
+    return theme("hkui_quick_tasks",$cache->data); 
+  }     
+  
+  $groups = hkui_panel();
+
+  
+  //Reviewing permissions
+  $no_permisions = false; //flag
+  
+  foreach($groups as $key1=>$items){
+    
+    foreach($items as $key2=>$item){
+
+      $router_item = menu_get_item($item['base_path']);
+      if(!$router_item['access']){
+        unset($groups[$key1][$key2]);
+        $no_permisions |= true;
+      }
+    }
+    if(sizeof($groups[$key1])==0){
+      unset($groups[$key1]);
+    }
+  }             
+
+  cache_set("hkui_cp:$roles",$groups);
+  return theme("hkui_quick_tasks",$groups);
+}
+
+
+
+function hkui_preprocess_page(&$vars){
+  $vars['hkui_quicktasks_block'] = hkui_quicktasks_block();
+}
+
+
+
+
+function hkui_block($op = 'list', $delta = 0, $edit = array()) {
+  switch ($op) {
+    case 'list':
+      $blocks['hkui']['info'] = t('Quick Tasks');
+    return $blocks;
+
+    case 'view': 
+
+      if($delta=='hkui'){
+        if(user_is_logged_in()){            
+          $block['content'] = hkui_quicktasks_block();  
+        }                         
+      }        
+    return $block;   
+  }      
+}
+
+
+
+
+
+
+function hkui_form_alter(&$form, &$form_state, $form_id) {
+  
+  //Overriding theme for Menu Settings Field in node_edit form
+  if(strpos($form_id,"node_form")&&$form["menu"]){
+     //Adding Required files  
+    
+    
+   $form["menu"]["parent"]["#theme"] = "hkui_menu_parent"; 
+  }
+  
+  if(false&&$form_id=='menu_edit_item'&&$form['menu']['#item']['menu_name']=='hkui_cp'){
+     
+    if($form['menu']['mlid']){
+      $icons = variable_get('hkui_cp',array());  
+      
+      $icon = $icons[$form['menu']['mlid']['#value']];
+    }
+    
+    $form['icon'] = array('#type' => 'fieldset', '#title' => t('Icon'));
+
+    if($icon){         
+      $form['icon']['preview'] = array(
+        "#value" => theme("image",$icon->filepath,"","",array("width"=>100),false),
+      ); 
+    }                               
+    
+    
+    
+    $form['icon']['icon_upload'] = array(
+      '#type' => 'file', 
+      '#title' => t('Upload Icon image'), 
+      '#size' => 48,
+    );
+ 
+   $form['#attributes']['enctype'] = 'multipart/form-data';
+   $form['#submit'][] = "hkui_menu_edit_item_submit"; 
+   $form['#validate'][] = "hkui_menu_edit_item_validate";
+   
+  }
+  
+  //Adding Link Path Link in Menu_Edit_Item form
+  if($form['menu']['link_path']&&false){  
+  
+    hkui_add_facebox();  
+     
+    $i = 0;   
+  
+    drupal_add_js('$(function(){
+      window.selectPage = function(page){
+        $(window.selectSource).val(page);
+        jQuery(document).trigger("close.facebox");
+      }
+      
+      });
+    ','inline');
+  //
+
+  
+   drupal_set_content('content',
+    "<div id='list_pages' style='display:none'   >
+     <iframe width='700' height='400' frameborder='0'  src='".url('lsi_cck_list_pages_url')."' >
+     </iframe>
+     </div>"
+   );
+
+      $form['menu']['link_path']["#suffix"] = "
+      <a href='#list_pages' rel='facebox' 
+      onclick=\"window.selectSource='#edit-menu-link-path'\"  >".
+      t("Choose an internal page")."</a>"; 
+  }  
+
+}
+
+function hkui_menu_edit_item_validate(&$form, &$form_state) {
+ 
+  
+   
+}
+
+function hkui_menu_edit_item_submit($form,&$form_state){
+
+  $path = file_directory_path();
+  $file = file_save_upload('icon_upload',array(),$path."/cp/");    
+  
+  $icons = variable_get('hkui_cp',array());
+  
+  $icons[$form_state['values']['menu']['mlid']] = $file;
+  
+  variable_set('hkui_cp',$icons);    
+  
+  
+}
+
+
+function theme_hkui_menu_parent($element){
+
+ $options = $element["#options"]; 
+ 
+ 
+ 
+  $value = $element["#default_value"]  ;
+  $tree = hkui_generate_tree($options,$value);
+
+  unset($tree["hkui_cp:0"]);
+  unset($tree['devel:0']);
+  unset($tree['navigation:0']);
+  unset($tree['secondary-links:0']);
+
+  $output =   "<div id='hkui-menu'  class='menu-parent' >".hkui_render_tree($tree,$element["#name"])."</div>";
+  
+  drupal_add_js("$(function(){
+    
+    $('#hkui-menu .menu-tree a').click(function(){
+       $('.depth-'+(parseInt(this.name)+1),$(this).parent()).slideToggle();
+         $(this).parent().toggleClass('opened');
+       })    
+       if($('#hkui-menu li.selected').size()&&$('#hkui-menu li.selected').css('display')!='none'){  
+           
+         var y = $('#hkui-menu li.selected').position().top;
+         $('#hkui-menu').scrollTop(y);
+       }      
+
+  
+  })",'inline');     
+   
+  return $output;
+}
+
+function hkui_render_tree($items,$name,$depth=0,$hide=FALSE){   
+    
+  if($hide){
+    $st = ' style="display:none" ';
+    $class = 'closed';
+  }
+  
+  
+
+  $output = "<ul class='menu-tree depth-$depth $class' $st >";
+  foreach($items as $key=>$item){   
+    
+    $hide = !$item['opened']||$item['selected']; 
+    $selected = $item['selected']?'selected':''; 
+    $id = $item['selected']?"id='menu-parent-selected-item'":"";
+    $opened = $item['opened']?'opened':'closed';
+    $checked = $item["selected"]?' checked="checked" ':"";
+    $leaf = $item['children']?"branch":"leaf";
+     
+    $output .= "<li class='$leaf $opened $selected ".hk_cleanstring($key)."' $id >";
+    $output .= "<input type='radio'  name='$name' value='$key' $checked />";
+    $output .=  "<a href='javascript:' name='$depth' >";
+    $output.= $item["value"];
+    $output.= "</a>";    
+    if($item['children']){
+      $output .= hkui_render_tree($item['children'],$name,$item['depth']+1,$hide);
+    }  
+    $output .= "</li>";
+  }
+  $output .= "</ul>";  
+  
+
+  
+  return $output;
+}
+
+function hkui_generate_tree($options,$value){
+  
+  foreach($options as $key=>$option){
+    $tree[$key]["value"] = trim(str_replace(">","",str_replace("<","",str_replace("-","",$option))));
+    $tree[$key]["depth"] = hkui_item_depth($option); 
+    if($key==$value){
+       $tree[$key]["selected"] = TRUE;
+       $tree[$key]["opened"] = TRUE; 
+    }
+  } 
+  
+  return hkui_generate_tree_rec($tree);   
+}
+
+function hkui_generate_tree_rec($items){
+
+  $cur = current($items);
+  $depth = $cur["depth"];
+  
+  foreach($items as $key=>$item){
+    if($item['depth']==$depth){
+      $cur_item = $key;
+      $tree[$cur_item] = $item;
+      continue;
+    }
+    $tree[$cur_item]['children'][$key] = $item;
+    if($item['opened']){
+      $tree[$cur_item]['opened'] = TRUE;
+    }
+  }
+  if(!$tree){
+    return $items;
+  }
+  
+  foreach($tree as $key=>$branch){
+    if($branch['children']){
+      $tree[$key]['children'] = hkui_generate_tree_rec($branch['children']); 
+    }     
+  }
+  
+  return $tree;   
+}
+
+function hkui_item_depth($name){
+  
+  if(strpos($name,"<")===0){
+    return 0;
+  }
+  
+  return strlen(substr($name,0,strpos($name,' ')))/2;  
+}
+
+
+function hkui_list_pages_url(){
+  
+  print '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+  <html xmlns="http://www.w3.org/1999/xhtml" lang="<?php print $language->language ?>" xml:lang="<?php print $language->language ?>" dir="<?php print $language->dir ?>">
+  '.
+  drupal_get_js().
+  drupal_get_css().
+  '</head>
+  <body>
+  ';
+
+  print views_embed_view('hkui_list_pages',"page_1");  
+  
+  print '</body></html>';
+  exit();
+}
+
+function hkui_preprocess_hkui_slideshow_field($vars){
+
+  $md = drupal_get_path('module','hkui'); 
+  
+  drupal_add_js("$md/javascripts/slideshow.js");
+  
+  drupal_add_js("$(
+    function(){        
+      slideshowWidget('.slideshow');
+    });
+  ","inline");
+  
+}
+
+function hkui_node_tasks($nid){
+
+    if(user_is_logged_in() && arg(1)!=$nid){ 
+      return    "<div id='node-tasks'>".l("[Edit","node/$nid/edit",array("query"=>"destination=".$_GET['q'] ))." | ".
+      l("Delete]","node/$nid/edit",array("query"=>"destination=".$_GET['q'] ))."</div>";
+    }
+}
+
+
+    
+      
+
+      

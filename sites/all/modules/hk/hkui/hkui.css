@@ -1,0 +1,115 @@
+/* Control Panel */
+
+#hkui-link a{
+  color: white;
+  font-weight: bold;
+}
+
+.hkui-quick-tasks{
+
+  /*padding:8px;
+  z-index: 100;
+  width:250px;
+  height:30px;
+  right:250px;
+  top:0px;
+  background-color: #E7E6DD;
+  border:1px solid #CCCCCC;
+  border-right: none;
+  border-top: none;
+  padding-left:10px;*/
+}
+
+.hkui-quick-tasks a{
+  
+  margin-top:3px;
+}
+.hkui-quick-tasks .actions{
+
+  margin-left: 12px;
+}
+
+.hkui-quick-tasks select{
+  width:100px;
+}
+
+#hkui-administrator{
+  border-collapse: collapse;
+}
+
+/**
+* #lsi-administrator
+*/
+#hkui-administrator .hkui-administrator-item{
+  text-align: center;
+  width:130px;
+  height:110px;
+  border:1px solid gray;
+  padding:15px 8px 0px 8px;
+  display:block;
+  float:left;  
+  vertical-align:top;
+ 
+  background-color: #EBEBEB;
+}
+#hkui-administrator .hkui-administrator-item:hover{
+  background-color: white;
+}
+
+#hkui-administrator img, #hkui-administrator a{
+  text-decoration:none; 
+  text-transform: capitalize;
+}
+
+#hkui-administrator {
+  color:gray;
+  float:left;
+  /*overflow: hidden;*/
+}
+
+#hkui-administrator fieldset{
+  float: left;
+}
+
+.view-edit-pages table td{
+  padding:8px;
+}
+
+.view-edit-pages table{
+  width:100%;
+}
+.view-edit-pages table tr.odd{
+  background-color : #DDDDDD;
+}
+
+/** Menu Settings Tree **/
+#hkui-menu  .menu-tree ul, #main .menu-tree li {
+  list-style: none;
+} 
+
+#hkui-menu  .menu-tree li a{
+  
+  font-weight: bold;
+  color:#666666;
+}
+#hkui-menu .menu-tree li.leaf a{
+  text-decoration: none;
+  font-weight: normal;
+  cursor:default; 
+  text-decoration: none; 
+}
+
+#hkui-menu .menu-tree li.branch.opened a{
+  color:black;
+}
+
+#hkui-menu input, #hkui-menu a{
+  display: inline;
+}
+
+#hkui-menu{
+  height: 250px;
+  overflow: auto;
+  width: 500px;
+  position: relative;
+}

@@ -1,0 +1,23 @@
+#realizedrel-wrapper .iframe-wrapper{
+	border:1px solid #CCCCCC;
+	background-color:#EEEEEE;
+	margin-bottom:6px;
+}
+#realizedrel-wrapper iframe{
+	border:none;
+}
+
+#realizedrel-wrapper{
+	
+	padding:10px;
+	border:1px solid #CCCCCC;
+	background-color:#DFDFDF;
+}
+
+#realizedrel-wrapper .loading-image{
+  position:relative;
+  top:8px;
+  left:8px;
+  display:none;
+}
+

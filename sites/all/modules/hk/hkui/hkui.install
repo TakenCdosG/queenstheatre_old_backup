@@ -1,0 +1,10 @@
+<?php
+ function hkui_install() {  
+    db_query("INSERT INTO {menu_custom} (menu_name, title, description) VALUES ('%s', '%s', '%s')", 'hkui_cp', "Control Panel", "HKUI Control Panel");
+  }
+  
+function hkui_uninstall(){
+  db_query("DELETE FROM {menu_custom} WHERE menu_name = 'hkui_cp'");
+  db_query("DELETE FROM {menu_links} WHERE module = 'hkui_cp'");
+ 
+} 

@@ -1,0 +1,9 @@
+; $Id:$
+name = Helper Kit
+description = "Helper tools, methods and UI enhancements."    
+core = 6.x
+package = Helper Kit
+; Information added by drupal.org packaging script on 2010-03-16
+version = "6.x-1.1"
+core = "6.x"
+

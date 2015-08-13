@@ -1,0 +1,9 @@
+; $Id: $
+name = Maxi Reference
+package = Maxi Reference
+description = Improves the nodereference UI
+core = 6.x
+weight = 100
+dependencies[] = lightbox2
+dependencies[] = views
+

@@ -1,0 +1,112 @@
+<?php
+/*
+ *
+*/
+function queens_init(){
+	if(arg(0)=='calendar'){
+		global $user;
+		$user->theme = 'cleantheme';
+		init_theme();
+	}
+}
+
+/*
+ * Create the calendar date box.
+*/
+function queens_preprocess_calendar_datebox(&$vars) {
+  
+  $date = $vars['date'];
+  $view = $vars['view'];
+  
+  $vars['day'] = intval(substr($date, 8, 2));
+  $force_view_url = !empty($view->date_info->block) ? TRUE : FALSE;
+  $vars['url'] = 'node/'.$view->result[0]->nid; //date_real_url($view, NULL, $date, $force_view_url);
+  $vars['link'] = l($vars['day'], $vars['url']);
+  $vars['granularity'] = $view->date_info->granularity;
+  $vars['mini'] = $view->date_info->mini;
+  
+	/* The following code has been added. It aggregates event data
+	  of that day and puts it in an HTML unordered list,
+	  which is parented in a div element, which, on its turn,
+	  is placed next to the hyperlink. The div element with the event
+	  data is hidden by using a "display:none" style.
+	  The code for telling Beautytips that this is the place to look for
+	  event data, is in the function
+	  calendar_tooltips_initialize_beautytips().
+	*/
+  if (!empty($vars['selected'])) {
+	 $bt_text = "<ul>";
+	 foreach ($vars['items'][$date] as $time => $results_at_that_time) {
+		foreach ($results_at_that_time as $num => $result) {
+		  $result = (array)$result;
+		  $bt_text .= "<li>";
+		  /* The event data shown in the tooltip can be specified in
+			  the display settings of your calendar view.
+			  Choose the "Block view" display, and check out
+			  the "Fields" section.
+		  */
+		  foreach ($view->field as $name => $field) {
+			 if (!$field->options['exclude']) {
+				
+				//$field->options['alter']['target'] = '_self';
+				
+			 if ($field->options['label'] != "")
+				  $bt_text .= "<div class=\"calendar_tooltips-" . $name .
+					 "-label\">" . $field->options['label'] . "</div>";
+				// Some fields have no alias.
+				$field_alias = $field->field_alias != 'unknown' ?
+				  $field->field_alias : $name;
+				if ($result[$field_alias] != ""){
+				  $text = str_replace('target="_blank"', 'target="_self"', $result[$field_alias]);
+				  $bt_text .= "<div class=\"calendar_tooltips-" . $name .
+					 "-value\">" . $text . "</div>";
+				}
+			 }
+		  }
+		  $bt_text .= "</li>";
+		}
+	 }
+	 $bt_text .= "</ul>";
+	 $bt_text = "<div class=\"calendar_tooltips\" style=\"display:none\">" .
+		$bt_text . "</div>";
+
+	if($vars['day']<10) $e_day = '0'.$vars['day'];
+		else $e_day = $vars['day'];
+
+	//We change the url to match with the current event
+	foreach($view->result as $value){
+		$event_day = substr($value->node_data_field_event_date_field_event_date_value2, 8, 2);
+		if($event_day == $e_day ){
+			if($checked[$vars['day']] != 1){
+				$vars['url'] = 'node/'.$value->nid;
+				$checked[$vars['day']] = 1;
+			}
+		}
+	}
+
+	 $vars['link'] = l($vars['day'], $vars['url'], array('html' => 'true')) . $bt_text;
+	  
+	 /*
+		 The balloon text is appended to the link variable,
+		 like this: "<a href=...>31</a> <div>balloon text</div>" (see above).
+		 which makes it difficult for the user to alter the link without
+		 losing the balloon text. That's why we provide an extra variable with
+		 the balloon text only. The user may use this to append to
+		 the new link when overriding calendar-datebox.tpl.php.
+	 */
+	 $vars['calendar_tooltips_text'] = $bt_text;
+  }
+  /* End of additional code. */
+
+  if ($view->date_info->mini) {
+	 if (!empty($vars['selected'])) {
+		$vars['class'] = 'mini-day-on';
+	 }
+	 else {
+		$vars['class'] = 'mini-day-off';
+	 }
+  }
+  else {
+	 $vars['class'] = 'day';
+  }
+}
